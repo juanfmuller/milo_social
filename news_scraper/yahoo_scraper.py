@@ -61,46 +61,45 @@ class YahooScraper:
     for link in self.article_links:
       self.driver_get_link(link)
       time.sleep(5)
-      self.scrape_full_article()
+      self.scrape_full_article(link)
+    print(self.full_articles)
+    print("-- done scraping all articles --")
 
 
-  def scrape_full_article(self):
-    print("here")
+  def scrape_full_article(self, link):
+    print("-- scraping article --")
     page_ = self.driver.page_source
     soup = BeautifulSoup(page_, "lxml")
 
     content_parent = soup.find("div", {"class":"caas-content-wrapper"})
-    author = content_parent.find("span", {"class":"caas-author-byline-collapse"})
+    author = content_parent.find("span", {"class":"caas-author-byline-collapse"}).get_text()
 
-    date_published = content_parent.find("time")
-    date_scraped = datetime.now().date()
+    date_published = content_parent.find("time")["datetime"]
+    date_scraped = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    image_links_soup = content_parent.find_all("img")
-    print(len(image_links_soup))
-
-    image_links = []
-    for link in image_links_soup:
-      try:
-        image_links.append(link["src"])
-      except:
-        image_links.append("")
+    image = content_parent.find("img")
+    try:
+      image_link = image["src"]
+    except:
+      image_link = ""
         
-    print(len(image_links))
-
     body_soup = content_parent.find("div", {"class":"caas-body"})
     paragraphs = body_soup.find_all("p")
 
     body = ""
     for elem in paragraphs:
       body += str(elem)
+
+    article_link = "https://finance.yahoo.com/" + link
     
-    self.full_articles.append([date_scraped, author, image_links, body, date_published])
+    self.full_articles.append([date_scraped, article_link, author, image_link, body, date_published])
+    print([date_scraped, article_link, author, image_link, body, date_published])
     
 
   def save_to_sql(self):
-    df = pd.DataFrame(self.full_articles, columns=['date_scraped', 'author', 'image_links', 'body', 'date_published'])
-    engine = create_engine('sqlite://', echo=False)
-    df.to_sql('yahoo_article', con=engine)
+    df = pd.DataFrame(self.full_articles, columns=['date_scraped', 'article_link', 'author', 'image_links', 'body', 'date_published'])
+    engine = sqla.create_engine('sqlite:///C:\\ds\\projects\\milo-social\\db.sqlite3', echo=False)
+    df.to_sql(con=engine, name='yahoo_article', if_exists='append', index=False)
     engine.execute("SELECT * FROM yahoo_article").fetchall()
     engine.dispose()
 
